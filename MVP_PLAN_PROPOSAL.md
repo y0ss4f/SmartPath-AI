@@ -1,33 +1,54 @@
-### Sprint 1: Architecture & DB (Completed)
+# SmartPath AI — MVP Sprint Plan
+
+### Phase 0: Foundation Fixes (Pre-Sprint) ✅
+> *Goal: Clean up scaffolding issues before building features.*
+* Fix `lang="fr"` in root layout (French-first UI).
+* Add `.env.example` with all required environment variables.
+* Create shared TypeScript interfaces (`src/types/database.ts`) matching the DB schema.
+* Add Row Level Security (RLS) policies to `supabase_schema.sql` for all 4 tables.
+* Wire up explicit `/student/*` public route bypass in middleware.
+* Remove unused dependencies (`react-webcam`, `twilio`).
+* Replace default Next.js boilerplate landing page.
+
+### Sprint 1: Architecture & DB ✅ (Completed)
 * Next.js setup, Tailwind, Supabase connection, Auth schema execution.
 
 ### Sprint 2: Core Auth & Parent Dashboard Foundation
 > *Goal: Build the basic shell so we have parents and students in the system.*
-* Implement `/login` for Parents.
-* Build `/dashboard/parent` (Fetch and display children).
-* Build simple UI to "Add a Child" to the database.
+* Implement `/login` for Parents (Email/Password via Supabase Auth).
+* Build `/dashboard/parent` (Server Component — fetch and display children).
+* Build "Ajouter un enfant" form (Client Component — insert into `students` with auto-generated `qr_code_hash`).
 
 ### Sprint 3: The AI Engine (Backend Validation)
-> *Goal: Write the Gemini logic first, test it without building a UI, and ensure the prompts reliably output the strict JSON schema.*
-* Build `/api/generate-quiz` (Flow A: Photo -> Initial Quiz JSON).
-* Build `/api/generate-course` (Flow B: Initial Score -> Smart Slides JSON).
-* Build `/api/generate-final-quiz` (Flow C: Slides -> Final Quiz JSON).
-* *We test these routes via Postman/cURL to guarantee Gemini is consistent before we build React components to render the JSON.*
+> *Goal: Write the Gemini logic first, test without UI, ensure prompts reliably return strict JSON.*
+* Create shared Gemini client utility (`src/utils/gemini.ts`).
+* Build `/api/generate-quiz` (Flow A: Photo → Initial Quiz JSON).
+* Build `/api/generate-course` (Flow B: Initial Score → Smart Slides JSON).
+* Build `/api/generate-final-quiz` (Flow C: Slides → Final Quiz JSON).
+* Test all routes via Postman/cURL with real French/Arabic notebook photos.
+* **Risk checkpoint:** If Gemini OCR struggles, evaluate fallbacks (image preprocessing, Cloud Vision pre-step).
 
 ### Sprint 4: The Core Student Experience (UI Integration)
 > *Goal: Connect the robust backend to the frontend UI.*
 * Build the unauthenticated `/student/[qr_code_hash]` route.
-* Add the photo upload button on the Parent Dashboard to trigger the Flow A API.
-* Build the interactive React components to render the Initial Quiz, Smart Slides, and Final Quiz.
-* Save the `initial_score` and `final_score` to Supabase.
+* Add photo upload button on Parent Dashboard to trigger Flow A API.
+* Build `<QuizPlayer />` Client Component (renders quiz JSON, collects answers).
+* Build `<SmartSlides />` Client Component (slide navigation with prev/next).
+* Build `<FinalQuizPlayer />` Client Component (final re-evaluation).
+* Wire full end-to-end flow and save `initial_score` + `final_score` to Supabase.
 
 ### Sprint 5: Notifications & Handoff Mechanics (Polish)
-> *Goal: Complete the loop by notifying parents and adding the smooth handoff features.*
-* Implement Meta's WhatsApp API to send the final score delta (Initial vs. Final).
-* Add the "QR Code" and "Pass the Device" buttons to the Parent Dashboard.
-* **If time permits:** Replicate the Parent Dashboard layout for the Teacher Dashboard and add the "Claim Student" logic.
+> *Goal: Complete the loop by notifying parents and adding smooth handoff features.*
+* Build `/api/notify` — send WhatsApp message via Meta Cloud API with score delta.
+* Add "Afficher le QR Code" button (renders QR on parent dashboard).
+* Add "Passer l'appareil" button (navigates to `/student/[hash]` on same device).
+* Add loading states (skeletons/spinners) for Gemini API latency (~10-15s).
+* Add error boundaries around Quiz, Slides, and API-dependent components.
+* **If time permits:** Build `/dashboard/teacher` with student claim logic.
 
-## 3. Why this plan is safer and faster:
-1. **Risk Mitigation:** If Gemini struggles to read cursive French/Arabic notebooks, we find out in Sprint 3 *before* spending days building Quiz UI components in Sprint 4.
-2. **Clearer Milestones:** Each sprint provides a distinctly testable block (Sprint 2 tests Auth, Sprint 3 tests the AI Prompts, Sprint 4 tests the UI components).
-3. **Simpler MVP:** If we run out of time, proving the Parent-Student-WhatsApp loop is a complete, impressive MVP by itself. The Teacher "Claim" flow is secondary to that core value proposition.
+---
+
+## Why This Plan Works
+1. **Risk Mitigation:** If Gemini struggles with cursive French/Arabic, we discover it in Sprint 3 — *before* building Quiz UI in Sprint 4.
+2. **Clearer Milestones:** Each sprint is a distinctly testable block (Phase 0: foundation, Sprint 2: auth, Sprint 3: AI, Sprint 4: UI, Sprint 5: polish).
+3. **Simpler MVP:** The Parent → Student → WhatsApp notification loop is a complete, impressive MVP by itself. The Teacher "Claim" flow is secondary.

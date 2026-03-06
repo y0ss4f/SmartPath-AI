@@ -39,6 +39,11 @@ export async function updateSession(request: NextRequest) {
     const isAuthRoute = request.nextUrl.pathname.startsWith('/login')
     const isPublicStudentRoute = request.nextUrl.pathname.startsWith('/student')
 
+    // Allow unauthenticated access to student routes
+    if (isPublicStudentRoute) {
+        return supabaseResponse;
+    }
+
     if (isProtectedRoute && !user) {
         // Redirect unauthenticated users to login page
         const url = request.nextUrl.clone()
