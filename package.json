@@ -1,5 +1,5 @@
 {
-  "name": "temporal-protostar",
+  "name": "smartpath-ai",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -16,9 +16,7 @@
     "next": "16.1.6",
     "qrcode.react": "^4.2.0",
     "react": "19.2.3",
-    "react-dom": "19.2.3",
-    "react-webcam": "^7.2.0",
-    "twilio": "^5.12.2"
+    "react-dom": "19.2.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
