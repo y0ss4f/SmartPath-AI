@@ -36,7 +36,7 @@ export async function updateSession(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     const isProtectedRoute = request.nextUrl.pathname.startsWith('/dashboard')
-    const isAuthRoute = request.nextUrl.pathname.startsWith('/login')
+    const isAuthRoute = request.nextUrl.pathname.startsWith('/login') || request.nextUrl.pathname.startsWith('/register')
     const isPublicStudentRoute = request.nextUrl.pathname.startsWith('/student')
 
     // Allow unauthenticated access to student routes

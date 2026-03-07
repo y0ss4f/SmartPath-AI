@@ -145,3 +145,26 @@ CREATE POLICY "Authenticated users can update quizzes"
     )
   );
 
+-- ============================================
+-- AUTO-PROFILE CREATION TRIGGER (GAP 2 FIX)
+-- ============================================
+-- When Supabase Auth creates a new user, automatically insert a row into profiles.
+-- The signUp() call must pass role and phone_number via options.data.
+-- This prevents the middleware redirect loop where profiles.role is missing.
+
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS trigger AS $$
+BEGIN
+  INSERT INTO public.profiles (id, role, phone_number)
+  VALUES (
+    NEW.id,
+    NEW.raw_user_meta_data->>'role',
+    NEW.raw_user_meta_data->>'phone_number'
+  );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
