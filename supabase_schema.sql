@@ -48,9 +48,9 @@ ALTER TABLE quizzes ENABLE ROW LEVEL SECURITY;
 -- ============================================
 
 -- PROFILES: Users can read/update their own profile
-CREATE POLICY "Users can view own profile"
+CREATE POLICY "Public profiles are viewable by everyone"
   ON profiles FOR SELECT
-  USING (auth.uid() = id);
+  USING (true);
 
 CREATE POLICY "Users can update own profile"
   ON profiles FOR UPDATE

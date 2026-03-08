@@ -12,8 +12,10 @@
     "@google/generative-ai": "^0.24.1",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.98.0",
+    "dotenv": "^17.3.1",
     "lucide-react": "^0.575.0",
     "next": "16.1.6",
+    "node-fetch": "^3.3.2",
     "qrcode.react": "^4.2.0",
     "react": "19.2.3",
     "react-dom": "19.2.3"
