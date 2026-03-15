@@ -13,7 +13,7 @@
 ### Sprint 1: Architecture & DB ✅ (Completed)
 * Next.js setup, Tailwind, Supabase connection, Auth schema execution.
 
-### Sprint 2: Core Auth & Parent Dashboard Foundation
+### Sprint 2: Core Auth & Parent Dashboard Foundation ✅ (Completed)
 > *Goal: Build the basic shell so we have parents and students in the system.*
 * Implement `/login` for Parents (Email/Password via Supabase Auth).
 * Build `/dashboard/parent` (Server Component — fetch and display children).
@@ -21,10 +21,22 @@
 
 ### Sprint 3: The AI Engine (Backend Validation)
 > *Goal: Write the Gemini logic first, test without UI, ensure prompts reliably return strict JSON.*
-* Create shared Gemini client utility (`src/utils/gemini.ts`).
-* Build `/api/generate-quiz` (Flow A: Photo → Initial Quiz JSON).
-* Build `/api/generate-course` (Flow B: Initial Score → Smart Slides JSON).
-* Build `/api/generate-final-quiz` (Flow C: Slides → Final Quiz JSON).
+* ~~Create shared Gemini client utility (`src/utils/gemini.ts`).~~ ✅ Done (pre-sprint)
+* Build `/api/generate-quiz` — Flow A.
+  * Input: `multipart/form-data { image, student_id, subject? }`
+  * Action: Send image to Gemini Vision → **INSERT** new row in `quizzes` table.
+  * Output: `{ quiz_id, quiz_questions[] }`
+  * Add `export const maxDuration = 60` to handle Gemini latency.
+* Build `/api/generate-course` — Flow B.
+  * Input: `{ quiz_id, wrong_answers[], initial_score }`
+  * Action: Send wrong answers to Gemini → **UPDATE** `quizzes` row (`generated_course_json`, `initial_score`).
+  * Output: `{ quiz_id, pain_points_identified[], smart_slides[] }`
+  * Add `export const maxDuration = 60`.
+* Build `/api/generate-final-quiz` — Flow C.
+  * Input: `{ quiz_id }`
+  * Action: Fetch slides from DB → Send to Gemini → **UPDATE** `quizzes` row (`final_quiz_json`).
+  * Output: `{ quiz_id, quiz_questions[] }`
+  * Add `export const maxDuration = 60`.
 * Test all routes via Postman/cURL with real French/Arabic notebook photos.
 * **Risk checkpoint:** If Gemini OCR struggles, evaluate fallbacks (image preprocessing, Cloud Vision pre-step).
 
