@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/utils/supabase/server';
 import { supabaseAdmin } from '@/utils/supabase/admin';
 import { geminiModel, extractJSON } from '@/utils/gemini';
 
@@ -25,16 +24,6 @@ interface GenerateCourseResponse {
 
 export async function POST(request: NextRequest) {
   try {
-    // --- Auth: verify parent session ---
-    const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'UNAUTHORIZED', message: 'Vous devez être connecté.' },
-        { status: 401 }
-      );
-    }
-
     // --- Parse JSON body ---
     const body: GenerateCourseRequest = await request.json();
     const { quiz_id, initial_score, wrong_answers } = body;
@@ -56,20 +45,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'INVALID_INPUT', message: 'Quiz introuvable.' },
         { status: 404 }
-      );
-    }
-
-    // --- Verify parent owns this student ---
-    const { data: student, error: studentError } = await supabaseAdmin
-      .from('students')
-      .select('parent_id')
-      .eq('id', quiz.student_id)
-      .single();
-
-    if (studentError || !student || student.parent_id !== user.id) {
-      return NextResponse.json(
-        { error: 'FORBIDDEN', message: 'Vous n\'êtes pas autorisé à modifier ce quiz.' },
-        { status: 403 }
       );
     }
 

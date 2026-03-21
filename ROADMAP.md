@@ -40,14 +40,25 @@
 * Test all routes via Postman/cURL with real French/Arabic notebook photos.
 * **Risk checkpoint:** If Gemini OCR struggles, evaluate fallbacks (image preprocessing, Cloud Vision pre-step).
 
-### Sprint 4: The Core Student Experience (UI Integration)
+### Sprint 4: The Core Student Experience (UI Integration) ✅ (Completed)
 > *Goal: Connect the robust backend to the frontend UI.*
-* Build the unauthenticated `/student/[qr_code_hash]` route.
-* Add photo upload button on Parent Dashboard to trigger Flow A API.
-* Build `<QuizPlayer />` Client Component (renders quiz JSON, collects answers).
-* Build `<SmartSlides />` Client Component (slide navigation with prev/next).
-* Build `<FinalQuizPlayer />` Client Component (final re-evaluation).
-* Wire full end-to-end flow and save `initial_score` + `final_score` to Supabase.
+
+**Architecture decisions (locked before Sprint 4):**
+* **Handoff URL:** Parent dashboard navigates to `/student/[hash]?quiz_id=...`. The `quiz_id` query param is read by the student page and also encoded in the QR code — covers both "Pass the Device" and QR scan on separate device.
+* **Auth on Flows B & C:** None. The `quiz_id` (UUID v4) is the implicit access token. Only the parent who ran Flow A knows it.
+* **`final_score` saving:** `<FinalQuizPlayer />` calls `POST /api/submit-score` after grading — this is what Sprint 5's notify route will read.
+* **Photo upload UX:** Per-student "Télécharger une photo" button in `<StudentList />`. On click → file picker → upload triggers Flow A → loading screen (10–15s) → on success, display handoff options ("Passer l'appareil" / "Afficher le QR Code").
+* **Student page state machine:** Single `step` state variable drives all rendering. States: `loading` → `quiz` → `generating-course` → `slides` → `generating-final-quiz` → `final-quiz` → `results`. On page refresh, state is lost and student restarts (MVP acceptable).
+* **RTL support:** All 3 components import `detectDirection()` from `src/utils/rtl.ts` and apply `dir` attribute to content containers.
+
+**Tasks:**
+* Build `/student/[qr_code_hash]/page.tsx` — reads `quiz_id` from `searchParams`, orchestrates 7-state machine.
+* Add per-student photo upload button to `<StudentList />` → calls `/api/generate-quiz` → on success navigates to handoff options.
+* Build `<QuizPlayer />` Client Component — renders quiz JSON, collects answers, computes score, calls `/api/generate-course`.
+* Build `<SmartSlides />` Client Component — slide navigation (prev/next), calls `/api/generate-final-quiz` on completion.
+* Build `<FinalQuizPlayer />` Client Component — renders final quiz, grades answers, calls `/api/submit-score`.
+* Build `<ResultsScreen />` — displays initial vs. final score delta.
+* All components: apply `detectDirection()` for Arabic/French RTL support.
 
 ### Sprint 5: Notifications & Handoff Mechanics (Polish)
 > *Goal: Complete the loop by notifying parents and adding smooth handoff features.*
