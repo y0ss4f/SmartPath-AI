@@ -1,10 +1,13 @@
+export const dynamic = 'force-dynamic'
+
 import { createClient } from '@/utils/supabase/server'
+import { supabaseAdmin } from '@/utils/supabase/admin'
 import { redirect } from 'next/navigation'
 import { logout } from '@/app/login/actions'
 import { StudentList } from '@/components/StudentList'
 import { AddStudentForm } from '@/components/AddStudentForm'
 import { BookOpen, LogOut } from 'lucide-react'
-import type { Student } from '@/types/database'
+import type { Student, Quiz } from '@/types/database'
 
 export default async function ParentDashboard() {
     const supabase = await createClient()
@@ -26,6 +29,25 @@ export default async function ParentDashboard() {
 
     if (error) {
         console.error('Error fetching students:', error)
+    }
+
+    // Fetch quizzes for all students
+    const studentIds = (students as Student[] || []).map(s => s.id)
+    const quizzesByStudent: Record<string, Quiz[]> = {}
+
+    if (studentIds.length > 0) {
+        const { data: quizzes } = await supabaseAdmin
+            .from('quizzes')
+            .select('*')
+            .in('student_id', studentIds)
+            .order('created_at', { ascending: false })
+
+        for (const q of (quizzes as Quiz[]) || []) {
+            if (!quizzesByStudent[q.student_id]) {
+                quizzesByStudent[q.student_id] = []
+            }
+            quizzesByStudent[q.student_id].push(q)
+        }
     }
 
     return (
@@ -68,7 +90,7 @@ export default async function ParentDashboard() {
                 <AddStudentForm />
 
                 {/* Students List */}
-                <StudentList students={(students as Student[]) || []} />
+                <StudentList students={(students as Student[]) || []} quizzesByStudent={quizzesByStudent} />
             </main>
         </div>
     )

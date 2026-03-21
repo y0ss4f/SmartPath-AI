@@ -1,12 +1,13 @@
 import { Users } from 'lucide-react'
 import { StudentCard } from './StudentCard'
-import type { Student } from '@/types/database'
+import type { Student, Quiz } from '@/types/database'
 
 interface StudentListProps {
     students: Student[]
+    quizzesByStudent: Record<string, Quiz[]>
 }
 
-export function StudentList({ students }: StudentListProps) {
+export function StudentList({ students, quizzesByStudent }: StudentListProps) {
     if (students.length === 0) {
         return (
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 text-center">
@@ -31,7 +32,7 @@ export function StudentList({ students }: StudentListProps) {
 
             <div className="grid gap-3">
                 {students.map((student) => (
-                    <StudentCard key={student.id} student={student} />
+                    <StudentCard key={student.id} student={student} quizzes={quizzesByStudent[student.id] || []} />
                 ))}
             </div>
         </div>

@@ -3,15 +3,17 @@
 import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { GraduationCap, Camera, Loader2, ArrowRight, Link as LinkIcon } from 'lucide-react'
-import type { Student } from '@/types/database'
+import { StudentStats } from './StudentStats'
+import type { Student, Quiz } from '@/types/database'
 
 interface StudentCardProps {
   student: Student
+  quizzes: Quiz[]
 }
 
 type CardState = 'idle' | 'uploading' | 'success'
 
-export function StudentCard({ student }: StudentCardProps) {
+export function StudentCard({ student, quizzes }: StudentCardProps) {
   const router = useRouter()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -138,6 +140,9 @@ export function StudentCard({ student }: StudentCardProps) {
           </div>
         </div>
       )}
+
+      {/* Stats */}
+      <StudentStats quizzes={quizzes} />
 
       <input
         ref={fileInputRef}
