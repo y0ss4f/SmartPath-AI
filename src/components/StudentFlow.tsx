@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Loader2, BookOpen } from 'lucide-react'
 import { QuizPlayer } from './QuizPlayer'
 import { SmartSlides } from './SmartSlides'
@@ -16,6 +16,49 @@ type Step =
   | 'generating-final-quiz'
   | 'final-quiz'
   | 'results'
+
+const FUN_FACTS = [
+  "Le cerveau humain peut stocker environ 2,5 pétaoctets d'informations !",
+  "Lire à voix haute aide à mémoriser 10 fois mieux qu'en lisant silencieusement.",
+  "Les erreurs sont la meilleure façon d'apprendre — chaque faute renforce la mémoire.",
+  "Faire des pauses régulières améliore la concentration et la rétention.",
+  "Le sommeil consolide les souvenirs : réviser avant de dormir est très efficace.",
+  "Expliquer une notion à quelqu'un d'autre est la meilleure façon de la maîtriser.",
+  "Dessiner des schémas aide le cerveau à organiser et retenir l'information.",
+]
+
+function FunFactLoader({ color, title, subtitle }: { color: string; title: string; subtitle: string }) {
+  const [factIndex, setFactIndex] = useState(() => Math.floor(Math.random() * FUN_FACTS.length))
+  const [visible, setVisible] = useState(true)
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setVisible(false)
+      setTimeout(() => {
+        setFactIndex((i) => (i + 1) % FUN_FACTS.length)
+        setVisible(true)
+      }, 400)
+    }, 5000)
+    return () => clearInterval(interval)
+  }, [])
+
+  return (
+    <div className="flex flex-col items-center justify-center py-20 text-center px-4">
+      <Loader2 className={`w-10 h-10 ${color} animate-spin mb-4`} />
+      <h3 className="text-lg font-semibold text-gray-800 mb-2">{title}</h3>
+      <p className="text-gray-500 text-sm max-w-xs mb-8">{subtitle}</p>
+      <div className="max-w-sm w-full bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Le saviez-vous ?</p>
+        <p
+          className="text-sm text-gray-700 leading-relaxed transition-opacity duration-400"
+          style={{ opacity: visible ? 1 : 0 }}
+        >
+          {FUN_FACTS[factIndex]}
+        </p>
+      </div>
+    </div>
+  )
+}
 
 interface StudentFlowProps {
   student: Student
@@ -121,6 +164,15 @@ export function StudentFlow({ student, quiz }: StudentFlowProps) {
       // Score save failure shouldn't block the results screen
     }
 
+    // Fire-and-forget WhatsApp notification — never blocks results screen
+    fetch('/api/notify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ quiz_id: quizId }),
+    }).catch(() => {
+      // Notification failure is silent — results screen is never blocked
+    })
+
     setStep('results')
   }
 
@@ -158,15 +210,11 @@ export function StudentFlow({ student, quiz }: StudentFlowProps) {
       )}
 
       {step === 'generating-course' && (
-        <div className="flex flex-col items-center justify-center py-20 text-center">
-          <Loader2 className="w-10 h-10 text-emerald-500 animate-spin mb-4" />
-          <h3 className="text-lg font-semibold text-gray-800 mb-2">
-            Analyse de tes réponses…
-          </h3>
-          <p className="text-gray-500 text-sm max-w-xs">
-            L&apos;IA prépare une leçon personnalisée pour t&apos;aider à progresser.
-          </p>
-        </div>
+        <FunFactLoader
+          color="text-emerald-500"
+          title="Analyse de tes réponses…"
+          subtitle="L'IA prépare une leçon personnalisée pour t'aider à progresser."
+        />
       )}
 
       {step === 'slides' && courseSlides.length > 0 && (
@@ -174,15 +222,11 @@ export function StudentFlow({ student, quiz }: StudentFlowProps) {
       )}
 
       {step === 'generating-final-quiz' && (
-        <div className="flex flex-col items-center justify-center py-20 text-center">
-          <Loader2 className="w-10 h-10 text-amber-500 animate-spin mb-4" />
-          <h3 className="text-lg font-semibold text-gray-800 mb-2">
-            Préparation du quiz final…
-          </h3>
-          <p className="text-gray-500 text-sm max-w-xs">
-            Encore un petit effort ! Un dernier quiz pour voir ta progression.
-          </p>
-        </div>
+        <FunFactLoader
+          color="text-amber-500"
+          title="Préparation du quiz final…"
+          subtitle="Encore un petit effort ! Un dernier quiz pour voir ta progression."
+        />
       )}
 
       {step === 'final-quiz' && finalQuizQuestions.length > 0 && (

@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { GraduationCap, Camera, Loader2, ArrowRight, Link as LinkIcon } from 'lucide-react'
+import { GraduationCap, Camera, Loader2, ArrowRight, Link as LinkIcon, QrCode, X, Check } from 'lucide-react'
+import { QRCodeSVG } from 'qrcode.react'
 import { StudentStats } from './StudentStats'
 import type { Student, Quiz } from '@/types/database'
 
@@ -20,6 +21,15 @@ export function StudentCard({ student, quizzes }: StudentCardProps) {
   const [state, setState] = useState<CardState>('idle')
   const [error, setError] = useState<string | null>(null)
   const [quizId, setQuizId] = useState<string | null>(null)
+  const [showQR, setShowQR] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current)
+    }
+  }, [])
 
   async function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -59,9 +69,15 @@ export function StudentCard({ student, quizzes }: StudentCardProps) {
     router.push(`/student/${student.qr_code_hash}?quiz_id=${quizId}`)
   }
 
+  function getStudentUrl() {
+    return `${window.location.origin}/student/${student.qr_code_hash}?quiz_id=${quizId}`
+  }
+
   function handleCopyLink() {
-    const url = `${window.location.origin}/student/${student.qr_code_hash}?quiz_id=${quizId}`
-    navigator.clipboard.writeText(url)
+    navigator.clipboard.writeText(getStudentUrl())
+    setCopied(true)
+    if (copyTimerRef.current) clearTimeout(copyTimerRef.current)
+    copyTimerRef.current = setTimeout(() => setCopied(false), 2500)
   }
 
   return (
@@ -132,12 +148,53 @@ export function StudentCard({ student, quizzes }: StudentCardProps) {
             </button>
             <button
               onClick={handleCopyLink}
+              className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-xl border transition-all ${
+                copied
+                  ? 'bg-green-100 border-green-300 text-green-700'
+                  : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              {copied ? (
+                <>
+                  <Check className="w-4 h-4" />
+                  Lien copié !
+                </>
+              ) : (
+                <>
+                  <LinkIcon className="w-4 h-4" />
+                  Copier le lien
+                </>
+              )}
+            </button>
+            <button
+              onClick={() => setShowQR((v) => !v)}
               className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-gray-200 text-gray-700 text-sm font-semibold rounded-xl hover:bg-gray-50 transition-all"
             >
-              <LinkIcon className="w-4 h-4" />
-              Copier le lien
+              {showQR ? (
+                <>
+                  <X className="w-4 h-4" />
+                  Masquer le QR
+                </>
+              ) : (
+                <>
+                  <QrCode className="w-4 h-4" />
+                  Afficher le QR
+                </>
+              )}
             </button>
           </div>
+
+          {/* QR Code display */}
+          {showQR && (
+            <div className="mt-4 flex flex-col items-center gap-3 pt-4 border-t border-green-200">
+              <p className="text-xs text-green-700 font-medium">
+                Scannez ce code QR avec l&apos;appareil de l&apos;élève
+              </p>
+              <div className="p-3 bg-white rounded-xl shadow-sm border border-green-100">
+                <QRCodeSVG value={getStudentUrl()} size={180} />
+              </div>
+            </div>
+          )}
         </div>
       )}
 

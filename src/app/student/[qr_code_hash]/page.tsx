@@ -1,5 +1,6 @@
 import { supabaseAdmin } from '@/utils/supabase/admin'
 import { StudentFlow } from '@/components/StudentFlow'
+import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { BookOpen } from 'lucide-react'
 import type { Student, Quiz } from '@/types/database'
 
@@ -82,5 +83,9 @@ export default async function StudentPage({ params, searchParams }: PageProps) {
     )
   }
 
-  return <StudentFlow student={student as Student} quiz={quiz} />
+  return (
+    <ErrorBoundary>
+      <StudentFlow student={student as Student} quiz={quiz} />
+    </ErrorBoundary>
+  )
 }
