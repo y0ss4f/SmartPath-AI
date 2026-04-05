@@ -2,9 +2,10 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { GraduationCap, Camera, Loader2, ArrowRight, Link as LinkIcon, QrCode, X, Check } from 'lucide-react'
+import { GraduationCap, Loader2, ArrowRight, Link as LinkIcon, QrCode, X, Check, BookOpen, ChevronDown, Sparkles } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { StudentStats } from './StudentStats'
+import { MATH_CURRICULUM, SUBJECTS } from '@/constants/mathCurriculum'
 import type { Student, Quiz } from '@/types/database'
 
 interface StudentCardProps {
@@ -12,11 +13,10 @@ interface StudentCardProps {
   quizzes: Quiz[]
 }
 
-type CardState = 'idle' | 'uploading' | 'success'
+type CardState = 'idle' | 'selecting' | 'generating' | 'success'
 
 export function StudentCard({ student, quizzes }: StudentCardProps) {
   const router = useRouter()
-  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [state, setState] = useState<CardState>('idle')
   const [error, setError] = useState<string | null>(null)
@@ -25,27 +25,42 @@ export function StudentCard({ student, quizzes }: StudentCardProps) {
   const [copied, setCopied] = useState(false)
   const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  // Selection state
+  const [selectedSubject, setSelectedSubject] = useState<string>('Mathématiques')
+  const [selectedUnit, setSelectedUnit] = useState<string>('')
+
+  // Units available for this student's grade
+  const cleanGrade = student.grade_level?.trim() || ''
+  const availableUnits = MATH_CURRICULUM[cleanGrade] || []
+
   useEffect(() => {
     return () => {
       if (copyTimerRef.current) clearTimeout(copyTimerRef.current)
     }
   }, [])
 
-  async function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
+  // Reset unit when switching back to selecting
+  useEffect(() => {
+    if (state === 'selecting') {
+      setSelectedUnit('')
+    }
+  }, [state])
+
+  async function handleGenerate() {
+    if (!selectedUnit) return
 
     setError(null)
-    setState('uploading')
+    setState('generating')
 
     try {
-      const formData = new FormData()
-      formData.append('image', file)
-      formData.append('student_id', student.id)
-
       const res = await fetch('/api/generate-quiz', {
         method: 'POST',
-        body: formData,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          student_id: student.id,
+          grade: student.grade_level,
+          unit: selectedUnit,
+        }),
       })
 
       const data = await res.json()
@@ -58,11 +73,8 @@ export function StudentCard({ student, quizzes }: StudentCardProps) {
       setState('success')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur inattendue.')
-      setState('idle')
+      setState('selecting')
     }
-
-    // Reset file input so the same file can be re-selected
-    if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
   function handlePassDevice() {
@@ -103,20 +115,20 @@ export function StudentCard({ student, quizzes }: StudentCardProps) {
           </div>
         </div>
 
-        {/* Upload button */}
+        {/* Launch quiz button */}
         {state === 'idle' && (
           <button
-            onClick={() => fileInputRef.current?.click()}
+            onClick={() => setState('selecting')}
             className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-sm font-semibold rounded-xl hover:from-blue-600 hover:to-indigo-700 transition-all shadow-sm"
           >
-            <Camera className="w-4 h-4" />
-            <span className="hidden sm:inline">Télécharger une photo</span>
-            <span className="sm:hidden">Photo</span>
+            <Sparkles className="w-4 h-4" />
+            <span className="hidden sm:inline">Lancer un quiz</span>
+            <span className="sm:hidden">Quiz</span>
           </button>
         )}
 
         {/* Loading state */}
-        {state === 'uploading' && (
+        {state === 'generating' && (
           <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 text-sm font-medium rounded-xl">
             <Loader2 className="w-4 h-4 animate-spin" />
             <span className="hidden sm:inline">Génération du quiz…</span>
@@ -129,6 +141,74 @@ export function StudentCard({ student, quizzes }: StudentCardProps) {
       {error && (
         <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
           {error}
+        </div>
+      )}
+
+      {/* Unit selection panel */}
+      {state === 'selecting' && (
+        <div className="mt-4 p-4 bg-blue-50/50 border border-blue-100 rounded-xl space-y-3">
+          <div className="flex items-center justify-between">
+            <h5 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+              <BookOpen className="w-4 h-4 text-blue-500" />
+              Choisir une unité
+            </h5>
+            <button
+              onClick={() => setState('idle')}
+              className="p-1 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-all"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Subject dropdown */}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Matière</label>
+            <div className="relative">
+              <select
+                value={selectedSubject}
+                onChange={(e) => setSelectedSubject(e.target.value)}
+                className="w-full appearance-none bg-white border border-gray-200 rounded-xl px-4 py-2.5 pr-10 text-sm font-medium text-gray-700 focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none transition-all"
+              >
+                {SUBJECTS.map((s) => (
+                  <option key={s.value} value={s.value} disabled={!s.enabled}>
+                    {s.label}{!s.enabled ? ' (bientôt)' : ''}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="w-4 h-4 text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
+          </div>
+
+          {/* Unit dropdown */}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Unité</label>
+            <div className="relative">
+              <select
+                value={selectedUnit}
+                onChange={(e) => setSelectedUnit(e.target.value)}
+                className="w-full appearance-none bg-white border border-gray-200 rounded-xl px-4 py-2.5 pr-10 text-sm font-medium text-gray-700 focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none transition-all"
+                dir="rtl"
+              >
+                <option value="">— اختر الوحدة —</option>
+                {availableUnits.map((unit) => (
+                  <option key={unit} value={unit}>
+                    {unit}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
+          </div>
+
+          {/* Generate button */}
+          <button
+            onClick={handleGenerate}
+            disabled={!selectedUnit}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-sm font-semibold rounded-xl hover:from-blue-600 hover:to-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+          >
+            <Sparkles className="w-4 h-4" />
+            Générer le quiz
+          </button>
         </div>
       )}
 
@@ -200,14 +280,6 @@ export function StudentCard({ student, quizzes }: StudentCardProps) {
 
       {/* Stats */}
       <StudentStats quizzes={quizzes} />
-
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
-        className="hidden"
-        onChange={handleFileSelected}
-      />
     </div>
   )
 }

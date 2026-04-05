@@ -21,10 +21,13 @@ export interface TeacherStudent {
   student_id: string;
 }
 
+export type Difficulty = 'easy' | 'medium' | 'hard' | 'expert';
+
 export interface QuizQuestion {
   question: string;
   options: string[];
   correct_answer: string;
+  difficulty: Difficulty;
 }
 
 export interface SmartSlide {
@@ -33,10 +36,25 @@ export interface SmartSlide {
   content: string;
 }
 
+export interface TimeEntry {
+  question_index: number;
+  seconds: number;
+}
+
+export type PerceivedDifficulty = 'easy' | 'okay' | 'hard';
+
+export interface WrongAnswer {
+  question: string;
+  selected: string;
+  correct: string;
+}
+
 export interface Quiz {
   id: string;
   student_id: string;
   subject: string | null;
+  grade: string | null;
+  unit: string | null;
   raw_ocr_text: string | null;
   initial_quiz_json: { status: string; quiz_questions: QuizQuestion[] } | null;
   generated_course_json: {
@@ -47,5 +65,7 @@ export interface Quiz {
   final_quiz_json: { status: string; quiz_questions: QuizQuestion[] } | null;
   initial_score: number | null;
   final_score: number | null;
+  time_spent_per_question: TimeEntry[] | null;
+  perceived_difficulty: PerceivedDifficulty | null;
   created_at: string;
 }

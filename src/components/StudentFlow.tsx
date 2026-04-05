@@ -1,17 +1,16 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { Loader2, BookOpen } from 'lucide-react'
 import { QuizPlayer } from './QuizPlayer'
 import { SmartSlides } from './SmartSlides'
 import { FinalQuizPlayer } from './FinalQuizPlayer'
 import { ResultsScreen } from './ResultsScreen'
-import type { Student, Quiz, QuizQuestion, SmartSlide } from '@/types/database'
+import type { Student, Quiz, QuizQuestion, SmartSlide, TimeEntry, WrongAnswer, PerceivedDifficulty } from '@/types/database'
 
 type Step =
   | 'loading'
   | 'quiz'
-  | 'generating-course'
   | 'slides'
   | 'generating-final-quiz'
   | 'final-quiz'
@@ -65,19 +64,13 @@ interface StudentFlowProps {
   quiz: Quiz | null
 }
 
-interface WrongAnswer {
-  question: string
-  selected: string
-  correct: string
-}
-
 export function StudentFlow({ student, quiz }: StudentFlowProps) {
   // Determine initial step from quiz state
   function getInitialStep(): Step {
     if (!quiz || !quiz.initial_quiz_json) return 'loading'
     if (quiz.final_score !== null) return 'results'
     if (quiz.final_quiz_json) return 'final-quiz'
-    if (quiz.generated_course_json) return 'slides'
+    // Both quiz + slides are pre-loaded — start with quiz
     return 'quiz'
   }
 
@@ -88,7 +81,7 @@ export function StudentFlow({ student, quiz }: StudentFlowProps) {
   const [quizQuestions] = useState<QuizQuestion[]>(
     quiz?.initial_quiz_json?.quiz_questions ?? []
   )
-  const [courseSlides, setCourseSlides] = useState<SmartSlide[]>(
+  const [courseSlides] = useState<SmartSlide[]>(
     quiz?.generated_course_json?.smart_slides ?? []
   )
   const [finalQuizQuestions, setFinalQuizQuestions] = useState<QuizQuestion[]>(
@@ -97,35 +90,24 @@ export function StudentFlow({ student, quiz }: StudentFlowProps) {
   const [initialScore, setInitialScore] = useState<number>(quiz?.initial_score ?? 0)
   const [finalScore, setFinalScore] = useState<number>(quiz?.final_score ?? 0)
 
+  // Time logs for the initial quiz (stored to submit combined later)
+  const [initialTimeLog, setInitialTimeLog] = useState<TimeEntry[]>([])
+
+  // Wrong answers from initial quiz (needed for final quiz generation)
+  const wrongAnswersRef = useRef<WrongAnswer[]>([])
+
   const quizId = quiz?.id
 
   // --- Step handlers ---
 
-  async function handleQuizComplete(score: number, wrongAnswers: WrongAnswer[]) {
+  function handleQuizComplete(score: number, wrongAnswers: WrongAnswer[], timeLog: TimeEntry[]) {
     setInitialScore(score)
-    setStep('generating-course')
+    setInitialTimeLog(timeLog)
+    wrongAnswersRef.current = wrongAnswers
     setError(null)
 
-    try {
-      const res = await fetch('/api/generate-course', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          quiz_id: quizId,
-          initial_score: score,
-          wrong_answers: wrongAnswers,
-        }),
-      })
-
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.message || 'Erreur lors de la génération du cours.')
-
-      setCourseSlides(data.smart_slides)
-      setStep('slides')
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur inattendue.')
-      setStep('quiz')
-    }
+    // Slides are already pre-generated, go directly to slides
+    setStep('slides')
   }
 
   async function handleSlidesComplete() {
@@ -136,7 +118,11 @@ export function StudentFlow({ student, quiz }: StudentFlowProps) {
       const res = await fetch('/api/generate-final-quiz', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ quiz_id: quizId }),
+        body: JSON.stringify({
+          quiz_id: quizId,
+          wrong_answers: wrongAnswersRef.current,
+          initial_score: initialScore,
+        }),
       })
 
       const data = await res.json()
@@ -150,15 +136,27 @@ export function StudentFlow({ student, quiz }: StudentFlowProps) {
     }
   }
 
-  async function handleFinalQuizComplete(score: number) {
+  async function handleFinalQuizComplete(score: number, _wrongAnswers: WrongAnswer[], timeLog: TimeEntry[], perceivedDifficulty: PerceivedDifficulty) {
     setFinalScore(score)
     setError(null)
+
+    // Combine initial quiz time log and final quiz time log
+    // Initial: question_index 0–11, Final: question_index 12–23
+    const combinedTimeLog = [
+      ...initialTimeLog,
+      ...timeLog.map(t => ({ ...t, question_index: t.question_index + 12 })),
+    ]
 
     try {
       await fetch('/api/submit-score', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ quiz_id: quizId, final_score: score }),
+        body: JSON.stringify({
+          quiz_id: quizId,
+          final_score: score,
+          time_spent_per_question: combinedTimeLog,
+          perceived_difficulty: perceivedDifficulty,
+        }),
       })
     } catch {
       // Score save failure shouldn't block the results screen
@@ -170,7 +168,7 @@ export function StudentFlow({ student, quiz }: StudentFlowProps) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ quiz_id: quizId }),
     }).catch(() => {
-      // Notification failure is silent — results screen is never blocked
+      // Notification failure is silent
     })
 
     setStep('results')
@@ -194,6 +192,11 @@ export function StudentFlow({ student, quiz }: StudentFlowProps) {
         <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-white rounded-full border border-gray-200 shadow-sm text-sm text-gray-600 mb-3">
           <BookOpen className="w-4 h-4 text-blue-500" />
           {student.name} — {student.grade_level}
+          {quiz?.unit && (
+            <span className="text-xs text-gray-400 border-l border-gray-200 pl-2" dir="rtl">
+              {quiz.unit}
+            </span>
+          )}
         </div>
       </div>
 
@@ -209,16 +212,8 @@ export function StudentFlow({ student, quiz }: StudentFlowProps) {
         <QuizPlayer questions={quizQuestions} onComplete={handleQuizComplete} />
       )}
 
-      {step === 'generating-course' && (
-        <FunFactLoader
-          color="text-emerald-500"
-          title="Analyse de tes réponses…"
-          subtitle="L'IA prépare une leçon personnalisée pour t'aider à progresser."
-        />
-      )}
-
       {step === 'slides' && courseSlides.length > 0 && (
-        <SmartSlides slides={courseSlides} onComplete={handleSlidesComplete} />
+        <SmartSlides slides={courseSlides} unit={quiz?.unit} grade={quiz?.grade} onComplete={handleSlidesComplete} />
       )}
 
       {step === 'generating-final-quiz' && (
@@ -238,7 +233,7 @@ export function StudentFlow({ student, quiz }: StudentFlowProps) {
           initialScore={initialScore}
           finalScore={finalScore}
           studentName={student.name}
-          totalQuestions={quizQuestions.length || 5}
+          totalQuestions={12}
         />
       )}
     </div>

@@ -2,23 +2,40 @@
 
 import { useState } from 'react'
 import { ChevronLeft, ChevronRight, BookOpen, CheckCircle } from 'lucide-react'
-import { detectDirection } from '@/utils/rtl'
 import type { SmartSlide } from '@/types/database'
 
 interface SmartSlidesProps {
   slides: SmartSlide[]
+  unit?: string | null
+  grade?: string | null
   onComplete: () => void
 }
 
-export function SmartSlides({ slides, onComplete }: SmartSlidesProps) {
+export function SmartSlides({ slides, unit, grade, onComplete }: SmartSlidesProps) {
   const [currentIndex, setCurrentIndex] = useState(0)
 
   const current = slides[currentIndex]
-  const dir = detectDirection(current.content)
   const isLast = currentIndex === slides.length - 1
 
   return (
     <div className="w-full max-w-2xl mx-auto">
+      {/* Unit/Grade context header */}
+      {unit && (
+        <div className="mb-4 text-center">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-emerald-50 border border-emerald-100 rounded-full text-sm" dir="rtl">
+            <BookOpen className="w-3.5 h-3.5 text-emerald-600" />
+            <span className="font-medium text-emerald-800">
+              {unit}
+            </span>
+            {grade && (
+              <span className="text-emerald-500 text-xs">
+                — {grade}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Progress */}
       <div className="mb-6">
         <div className="flex items-center justify-between text-sm text-gray-500 mb-2">
@@ -36,10 +53,10 @@ export function SmartSlides({ slides, onComplete }: SmartSlidesProps) {
       </div>
 
       {/* Slide card */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6" dir={dir}>
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6" dir="rtl">
         <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-700 text-xs font-medium rounded-full mb-4">
           <BookOpen className="w-3 h-3" />
-          Concept
+          مفهوم
         </div>
 
         <h3 className="text-xl font-bold text-gray-900 mb-4">
