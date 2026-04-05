@@ -110,8 +110,8 @@ export async function POST(request: NextRequest) {
 
     const messageText =
       `SmartPath AI : ${student.name} a terminé son diagnostic et sa révision pour ${subject}. ` +
-      `Score initial : ${initialScore}/5. ` +
-      `Score final après révision : ${finalScore}/5. ` +
+      `Score initial : ${initialScore}/12. ` +
+      `Score final après révision : ${finalScore}/12. ` +
       suffix;
 
     console.log('[notify] Sending WhatsApp to:', phoneNumber, '| message:', messageText);

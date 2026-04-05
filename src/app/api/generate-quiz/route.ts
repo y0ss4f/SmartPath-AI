@@ -154,6 +154,30 @@ Return this exact JSON structure:
     // Ensure exactly 12 questions (trim if Gemini returned more)
     const quiz_questions = parsed.quiz_questions.slice(0, 12);
 
+    // Validate internal structure of each question
+    const validDifficulties = ['easy', 'medium', 'hard', 'expert'];
+    for (let i = 0; i < quiz_questions.length; i++) {
+      const q = quiz_questions[i];
+      if (!Array.isArray(q.options) || q.options.length !== 4) {
+        return NextResponse.json(
+          { error: 'GEMINI_ERROR', message: `Question ${i + 1} n'a pas exactement 4 options.` },
+          { status: 502 }
+        );
+      }
+      if (!q.options.includes(q.correct_answer)) {
+        return NextResponse.json(
+          { error: 'GEMINI_ERROR', message: `Question ${i + 1}: correct_answer ne correspond à aucune des options.` },
+          { status: 502 }
+        );
+      }
+      if (!validDifficulties.includes(q.difficulty)) {
+        return NextResponse.json(
+          { error: 'GEMINI_ERROR', message: `Question ${i + 1}: difficulty invalide "${q.difficulty}".` },
+          { status: 502 }
+        );
+      }
+    }
+
     // --- Insert into quizzes table ---
     const { data: quiz, error: dbError } = await supabaseAdmin
       .from('quizzes')

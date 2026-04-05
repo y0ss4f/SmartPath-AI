@@ -56,13 +56,13 @@ export interface Quiz {
   grade: string | null;
   unit: string | null;
   raw_ocr_text: string | null;
-  initial_quiz_json: { status: string; quiz_questions: QuizQuestion[] } | null;
+  initial_quiz_json: { status: 'success' | 'error'; quiz_questions: QuizQuestion[] } | null;
   generated_course_json: {
-    status: string;
+    status: 'success' | 'error';
     pain_points_identified: string[];
     smart_slides: SmartSlide[];
   } | null;
-  final_quiz_json: { status: string; quiz_questions: QuizQuestion[] } | null;
+  final_quiz_json: { status: 'success' | 'error'; quiz_questions: QuizQuestion[] } | null;
   initial_score: number | null;
   final_score: number | null;
   time_spent_per_question: TimeEntry[] | null;

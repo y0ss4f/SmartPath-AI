@@ -47,12 +47,26 @@ export async function POST(request: NextRequest) {
       const isValid = time_spent_per_question.every(
         (entry: TimeEntry) =>
           typeof entry.question_index === 'number' &&
+          Number.isInteger(entry.question_index) &&
           typeof entry.seconds === 'number' &&
           entry.seconds >= 0
       );
       if (!isValid) {
         return NextResponse.json(
-          { error: 'INVALID_INPUT', message: 'Chaque entrée de time_spent_per_question doit avoir question_index (nombre) et seconds (nombre >= 0).' },
+          { error: 'INVALID_INPUT', message: 'Chaque entrée de time_spent_per_question doit avoir question_index (entier) et seconds (nombre >= 0).' },
+          { status: 400 }
+        );
+      }
+      // Ensure all 12 questions are represented with no gaps or duplicates
+      const indices = time_spent_per_question.map((e: TimeEntry) => e.question_index);
+      const uniqueIndices = new Set(indices);
+      if (
+        uniqueIndices.size !== 12 ||
+        Math.min(...indices) !== 0 ||
+        Math.max(...indices) !== 11
+      ) {
+        return NextResponse.json(
+          { error: 'INVALID_INPUT', message: 'time_spent_per_question doit contenir exactement 12 entrées avec des indices 0 à 11 sans doublons.' },
           { status: 400 }
         );
       }

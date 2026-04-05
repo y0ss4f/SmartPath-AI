@@ -69,7 +69,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const course = quiz.generated_course_json as {
+    const rawCourse = quiz.generated_course_json as Record<string, unknown>;
+    if (!rawCourse || !Array.isArray(rawCourse.smart_slides) || rawCourse.smart_slides.length === 0) {
+      return NextResponse.json(
+        { error: 'INVALID_INPUT', message: 'Les slides du cours sont malformées ou vides.' },
+        { status: 400 }
+      );
+    }
+    const course = rawCourse as {
       pain_points_identified: string[];
       smart_slides: { type: string; title: string; content: string }[];
     };
@@ -144,6 +151,30 @@ Return this exact JSON structure:
 
     // Ensure exactly 12 questions
     const quiz_questions = parsed.quiz_questions.slice(0, 12);
+
+    // Validate internal structure of each question
+    const validDifficulties = ['easy', 'medium', 'hard', 'expert'];
+    for (let i = 0; i < quiz_questions.length; i++) {
+      const q = quiz_questions[i];
+      if (!Array.isArray(q.options) || q.options.length !== 4) {
+        return NextResponse.json(
+          { error: 'GEMINI_ERROR', message: `Question ${i + 1} n'a pas exactement 4 options.` },
+          { status: 502 }
+        );
+      }
+      if (!q.options.includes(q.correct_answer)) {
+        return NextResponse.json(
+          { error: 'GEMINI_ERROR', message: `Question ${i + 1}: correct_answer ne correspond à aucune des options.` },
+          { status: 502 }
+        );
+      }
+      if (!validDifficulties.includes(q.difficulty)) {
+        return NextResponse.json(
+          { error: 'GEMINI_ERROR', message: `Question ${i + 1}: difficulty invalide "${q.difficulty}".` },
+          { status: 502 }
+        );
+      }
+    }
 
     // --- Update quizzes row ---
     const { error: dbError } = await supabaseAdmin
