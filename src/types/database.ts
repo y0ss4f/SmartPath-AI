@@ -34,6 +34,7 @@ export interface SmartSlide {
   type: 'concept';
   title: string;
   content: string;
+  page_reference?: string;
 }
 
 export interface TimeEntry {

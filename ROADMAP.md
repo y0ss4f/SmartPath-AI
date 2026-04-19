@@ -51,7 +51,7 @@
 
 ---
 
-### Sprint 6: Math-Only Structured Quiz Engine 🔄 (Current)
+### Sprint 6: Math-Only Structured Quiz Engine ✅ (Completed)
 > *Goal: Replace the OCR photo-upload flow with a curriculum-driven structured quiz engine. Math only, Grades 1–6.*
 
 **Architecture decisions (locked):**
@@ -63,60 +63,59 @@
 * **Perceived difficulty rating.** After the final quiz, a non-graded screen asks: `"كيف وجدت هذا الاختبار؟"` with emoji options: 😊 سهل | 😐 عادي | 😓 صعب. Saved to `quizzes.perceived_difficulty`.
 * **Simplified state machine:** `loading → quiz → slides → generating-final-quiz → final-quiz → results`. The `generating-course` state is removed.
 * **Hardcoded curriculum.** Unit lists per grade are defined in `src/constants/mathCurriculum.ts` (Arabic unit names, Tunisian Grade 1–6 program). Zero token overhead — not fetched at runtime.
-* **Quiz history.** A `<QuizHistory />` component on the parent dashboard shows all past quiz sessions per student (newest first): Unit | Scores | Date | Perceived Difficulty.
 
-**Database migration (run before coding UI):**
-```sql
-ALTER TABLE quizzes
-  ADD COLUMN IF NOT EXISTS grade TEXT,
-  ADD COLUMN IF NOT EXISTS unit TEXT,
-  ADD COLUMN IF NOT EXISTS time_spent_per_question JSONB,
-  ADD COLUMN IF NOT EXISTS perceived_difficulty TEXT CHECK (perceived_difficulty IN ('easy', 'okay', 'hard'));
-```
-
-**Tasks:**
-* [ ] Run Supabase migration — add `grade`, `unit`, `time_spent_per_question`, `perceived_difficulty` columns.
-* [ ] Create `src/constants/mathCurriculum.ts` — full Tunisian math curriculum, Grades 1–6, Arabic unit names.
-* [ ] Update `src/types/database.ts` — add `difficulty` to `QuizQuestion`, new `Quiz` columns, `TimeEntry` type.
-* [ ] Refactor `/api/generate-quiz` — JSON body, 12Q + slides in one call, Arabic, difficulty-tagged.
-* [ ] Deprecate `/api/generate-course` — return `410 Gone`.
-* [ ] Refactor `/api/generate-final-quiz` — 12Q, Arabic, difficulty-tagged, reads `grade`/`unit` from DB.
-* [ ] Extend `/api/submit-score` — accept and save `time_spent_per_question` + `perceived_difficulty`.
-* [ ] Refactor `<StudentCard />` — replace file input with Subject/Unit dropdown + "Générer" button.
-* [ ] Refactor `<QuizPlayer />` — add count-up timer per question + difficulty badges.
-* [ ] Refactor `<FinalQuizPlayer />` — add timer + post-submit perceived difficulty emoji screen.
-* [ ] Simplify `<StudentFlow />` — remove `generating-course` state, load slides from initial fetch.
-* [ ] Build `<QuizHistory />` — per-student quiz history table on parent dashboard.
+**All tasks completed.** ✅
 
 ---
 
-### Sprint 7: RAG Agent — PDF-Backed Course Material 🔜 (Planned)
-> *Goal: Ground quiz and slide generation in official Tunisian textbook content via semantic retrieval.*
+### Sprint 7: RAG Agent — Textbook-Grounded Generation 🔄 (Current)
+> *Goal: Ground quiz and slide generation in official Tunisian textbook content using Gemini's native multimodal document understanding.*
 
-**Architecture (Supabase pgvector + Next.js API):**
-* Ingest 6 PDF math textbooks (Grades 1–6) → chunk by section → embed via Gemini Embeddings API.
-* Store embeddings in a new Supabase table `course_chunks` (with `pgvector` extension).
-* Build `/api/rag-retrieve` — receives `{ grade, unit }`, returns top-K semantically relevant text chunks.
-* Update `generate-quiz` prompt to include retrieved chunks (textbook context).
-* Update `generate-final-quiz` to also leverage retrieved context.
+**Architecture (Gemini Native Multimodal — Option A):**
+* Upload 6 PDF math textbooks (Grades 1–6) to the Gemini File API as full documents.
+* Store file URIs in the `textbook_files` Supabase table (`grade` → `gemini_file_uri` + `gemini_file_name`).
+* At generation time, look up the grade's textbook URI and pass the entire PDF as `fileData` context alongside the Gemini prompt.
+* Automatic re-upload: Gemini files expire after ~48 hours. The `src/utils/textbook.ts` utility detects expired files and re-uploads from disk automatically.
+* No pgvector, no text extraction, no chunking — Gemini reads the PDF natively with full visual+text understanding.
+
+**Why Option A (not pgvector RAG):**
+* Arabic math text extraction from PDFs is notoriously unreliable (garbled RTL + broken equations).
+* Gemini processes the full PDF layout natively — diagrams, tables, exercise boxes all preserved.
+* Zero infrastructure overhead: no embedding pipeline, no vector database, no chunk management.
 
 **RAG Agent Capabilities:**
-* Match exercises to official Tunisian learning objectives.
-* Cite specific textbook pages in Smart Slides.
+* Base quiz questions on the exact methodology and problem types found in the official textbook.
+* Base Smart Slides explanations on how the textbook teaches each unit.
+* Cite specific textbook pages in Smart Slides via `page_reference` field.
 * Ensure quiz questions are accurate and curriculum-aligned.
 
-**Tasks (deferred):**
-* [ ] Set up pgvector extension in Supabase.
-* [ ] Build PDF ingestion + chunking + embedding pipeline script.
-* [ ] Create `course_chunks` table with embedding column.
-* [ ] Build `/api/rag-retrieve` route.
-* [ ] Integrate retrieval into `generate-quiz` and `generate-final-quiz` prompts.
-* [ ] Display textbook page citations in `<SmartSlides />`.
+**Database setup:**
+```sql
+CREATE TABLE IF NOT EXISTS textbook_files (
+  grade TEXT PRIMARY KEY,
+  gemini_file_uri TEXT NOT NULL,
+  gemini_file_name TEXT,
+  uploaded_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+ALTER TABLE textbook_files ENABLE ROW LEVEL SECURITY;
+```
+
+**Tasks:**
+* [x] Create `textbook_files` Supabase table.
+* [x] Create `scripts/upload-textbooks.ts` — one-time upload of 6 PDFs to Gemini File API.
+* [x] Create `src/utils/textbook.ts` — file URI retrieval with auto-re-upload on expiry.
+* [x] Update `/api/generate-quiz` — attach textbook PDF as Gemini fileData context.
+* [x] Update `/api/generate-final-quiz` — attach textbook PDF for grounded final quiz.
+* [x] Update `src/types/database.ts` — add `page_reference` to `SmartSlide` type.
+* [x] Update `src/components/SmartSlides.tsx` — display textbook page citation badge.
+* [ ] Run upload script to populate `textbook_files` table.
+* [ ] End-to-end test: generate quiz with textbook grounding, verify page citations.
 
 ---
 
 ## Why This Plan Works
 1. **Risk Mitigation:** Hardcoded curriculum constant eliminates the most fragile part (OCR on handwriting). Gemini now works from clean, structured input.
 2. **Data Richness:** Per-question timing + perceived difficulty create a behavioral dataset that no standard quiz platform collects — this becomes a competitive moat.
-3. **Scalable RAG foundation:** Sprint 6 establishes the clean `{ grade, unit }` contract that Sprint 7 simply extends — the RAG layer slots in without breaking existing flows.
-4. **Single source of truth:** All curriculum data lives in one TS constant. When Sprint 7 upgrades it to a live RAG retrieval, only one file changes.
+3. **Textbook Grounding:** By passing the official PDF directly to Gemini, all generated content is curriculum-aligned without the fragility of Arabic PDF text extraction.
+4. **Single source of truth:** All curriculum data lives in one TS constant. The textbook PDF provides deep contextual grounding without replacing the curriculum structure.
+

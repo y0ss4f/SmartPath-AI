@@ -222,26 +222,14 @@ loading → quiz → slides → generating-final-quiz → final-quiz → results
 ### ✅ Sprint 3: The AI Engine — Backend Validation (Completed)
 ### ✅ Sprint 4: The Core Student Experience — UI Integration (Completed)
 ### ✅ Sprint 5: Notifications & Handoff Mechanics (Completed)
+### ✅ Sprint 6: Math-Only Structured Quiz Engine (Completed)
 
-### 🔄 Sprint 6: Math-Only Structured Quiz Engine (Current)
-> *Goal: Replace OCR flow with curriculum-driven unit selection. Restructure quiz to 12Q/4-tier. Add per-question timing and perceived difficulty.*
-* Run Supabase migration (add `grade`, `unit`, `time_spent_per_question`, `perceived_difficulty` columns).
-* Create `src/constants/mathCurriculum.ts` with Tunisian Grade 1–6 unit lists in Arabic.
-* Refactor `/api/generate-quiz` — JSON body, single Gemini call, 12Q + slides.
-* Deprecate `/api/generate-course` — return `410 Gone`.
-* Refactor `/api/generate-final-quiz` — 12 questions, Arabic, difficulty-tagged.
-* Extend `/api/submit-score` — accept `time_spent_per_question` and `perceived_difficulty`.
-* Update TypeScript types in `src/types/database.ts`.
-* Refactor `<StudentCard />` — replace file upload with unit dropdown.
-* Refactor `<QuizPlayer />` — add per-question timer + difficulty badges.
-* Refactor `<FinalQuizPlayer />` — add timer + perceived difficulty screen.
-* Simplify `<StudentFlow />` — remove `generating-course` state.
-* Build `<QuizHistory />` — quiz history list on parent dashboard.
+### 🔄 Sprint 7: RAG Agent — Textbook-Grounded Generation (Current)
+> *Goal: Ground quiz/slide generation in official Tunisian textbook PDFs using Gemini's native multimodal document understanding (Option A — no pgvector, no text extraction).*
+* Upload 6 textbook PDFs to Gemini File API, store URIs in `textbook_files` table.
+* `src/utils/textbook.ts` — retrieves file URIs from DB with automatic re-upload on 48h expiry.
+* `/api/generate-quiz` — attaches textbook PDF as `fileData` context to Gemini call, instructs textbook grounding + page citations.
+* `/api/generate-final-quiz` — same textbook grounding for final re-evaluation.
+* `SmartSlide` type includes optional `page_reference` field for textbook citations.
+* `<SmartSlides />` displays textbook page citation badge (📖 صفحة XX).
 
-### 🔜 Sprint 7: RAG Agent — PDF-Backed Course Material
-> *Goal: Ingest Tunisian math textbooks (PDF, Grades 1–6), embed into Supabase pgvector, and use semantic retrieval to ground quiz generation and Smart Slides in official textbook content.*
-* Ingest 6 PDF textbooks → chunk → embed via Gemini Embeddings API.
-* Store embeddings in Supabase `course_chunks` table with pgvector.
-* Build `/api/rag-retrieve` route — semantic search given `{ grade, unit }`.
-* Update `generate-quiz` prompt to include retrieved textbook excerpts.
-* RAG agent capabilities: cite textbook pages, match exercises to learning standards.

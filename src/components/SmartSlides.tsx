@@ -66,6 +66,15 @@ export function SmartSlides({ slides, unit, grade, onComplete }: SmartSlidesProp
         <div className="text-gray-700 leading-relaxed whitespace-pre-line">
           {current.content}
         </div>
+
+        {/* Textbook page reference citation */}
+        {current.page_reference && (
+          <div className="mt-4 pt-3 border-t border-gray-100" dir="rtl">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-700 text-xs font-medium rounded-full border border-amber-100">
+              📖 {current.page_reference}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Navigation */}

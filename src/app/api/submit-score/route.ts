@@ -57,16 +57,16 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         );
       }
-      // Ensure all 12 questions are represented with no gaps or duplicates
+      // Ensure all 24 questions (initial + final) are represented with no gaps or duplicates
       const indices = time_spent_per_question.map((e: TimeEntry) => e.question_index);
       const uniqueIndices = new Set(indices);
       if (
-        uniqueIndices.size !== 12 ||
+        uniqueIndices.size !== 24 ||
         Math.min(...indices) !== 0 ||
-        Math.max(...indices) !== 11
+        Math.max(...indices) !== 23
       ) {
         return NextResponse.json(
-          { error: 'INVALID_INPUT', message: 'time_spent_per_question doit contenir exactement 12 entrées avec des indices 0 à 11 sans doublons.' },
+          { error: 'INVALID_INPUT', message: 'time_spent_per_question doit contenir exactement 24 entrées avec des indices 0 à 23 sans doublons.' },
           { status: 400 }
         );
       }

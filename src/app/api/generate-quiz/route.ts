@@ -3,6 +3,7 @@ import { createClient } from '@/utils/supabase/server';
 import { supabaseAdmin } from '@/utils/supabase/admin';
 import { geminiModel, extractJSON } from '@/utils/gemini';
 import { MATH_CURRICULUM } from '@/constants/mathCurriculum';
+import { getTextbookFileUri } from '@/utils/textbook';
 
 export const maxDuration = 60;
 
@@ -17,6 +18,7 @@ interface SmartSlideResponse {
   type: 'concept';
   title: string;
   content: string;
+  page_reference?: string;
 }
 
 interface GenerateQuizResponse {
@@ -83,11 +85,37 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // --- Send to Gemini ---
+    // --- Fetch textbook context (RAG via Gemini File API) ---
+    let textbookFileUri: string | null = null;
+    try {
+      textbookFileUri = await getTextbookFileUri(grade);
+      if (textbookFileUri) {
+        console.log(`[generate-quiz] Textbook found for grade "${grade}": ${textbookFileUri}`);
+      } else {
+        console.log(`[generate-quiz] No textbook available for grade "${grade}", using prompt-only mode.`);
+      }
+    } catch (err) {
+      console.warn('[generate-quiz] Textbook retrieval failed, continuing without:', err);
+    }
+
+    // --- Build prompt ---
+    const textbookInstruction = textbookFileUri
+      ? `\n\nIMPORTANT — TEXTBOOK GROUNDING:
+The attached PDF is the official Tunisian math textbook for ${grade}.
+- You MUST find the chapter/section about "${unit}" in this textbook.
+- Base your questions on the exact methodology, terminology, and problem types found in the textbook.
+- Base your Smart Slides explanations on how the textbook teaches this unit.
+- For each Smart Slide, include a "page_reference" field citing the textbook page(s) you referenced (e.g., "صفحة 42" or "صفحات 42-45"). If you cannot identify the exact page, use "المنهج الرسمي".`
+      : '';
+
+    const pageRefField = textbookFileUri
+      ? `\n      "page_reference": "صفحة XX (the textbook page number referenced)"`
+      : '';
+
     const prompt = `You are a Tunisian primary school math teacher AI. You create assessments aligned with the official Tunisian math curriculum.
 
 Grade: ${grade}
-Unit: ${unit}
+Unit: ${unit}${textbookInstruction}
 
 Generate a complete structured assessment in ARABIC containing:
 
@@ -127,13 +155,37 @@ Return this exact JSON structure:
     {
       "type": "concept",
       "title": "Arabic slide title",
-      "content": "Arabic explanation with examples using Latin numerals"
+      "content": "Arabic explanation with examples using Latin numerals"${pageRefField}
     }
   ]
 }`;
 
-    const result = await geminiModel.generateContent(prompt);
-    const responseText = result.response.text();
+    // --- Call Gemini (with or without textbook file) ---
+    const contentParts: Parameters<typeof geminiModel.generateContent>[0] = textbookFileUri
+      ? [
+          {
+            fileData: {
+              mimeType: 'application/pdf',
+              fileUri: textbookFileUri,
+            },
+          },
+          { text: prompt },
+        ]
+      : prompt;
+
+    let responseText = '';
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const result = await geminiModel.generateContent(contentParts);
+        responseText = result.response.text();
+        break;
+      } catch (err: unknown) {
+        if (attempt === 3) throw err;
+        console.warn(`[generate-quiz] Gemini error on attempt ${attempt}, retrying in 2 seconds...`);
+        await new Promise(r => setTimeout(r, 2000));
+      }
+    }
+
     const parsed = extractJSON<GenerateQuizResponse>(responseText);
 
     // --- Validate parsed response ---

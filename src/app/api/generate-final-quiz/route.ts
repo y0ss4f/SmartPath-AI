@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/utils/supabase/admin';
 import { geminiModel, extractJSON } from '@/utils/gemini';
+import { getTextbookFileUri } from '@/utils/textbook';
 
 export const maxDuration = 60;
 
@@ -87,7 +88,7 @@ export async function POST(request: NextRequest) {
       .update({ initial_score })
       .eq('id', quiz_id);
 
-    // --- Build prompt ---
+    // --- Build wrong answers and slides context ---
     const wrongAnswersList = (wrong_answers as WrongAnswer[])
       .map((wa: WrongAnswer, i: number) => `${i + 1}. السؤال: "${wa.question}"\n   إجابة التلميذ: "${wa.selected}"\n   الإجابة الصحيحة: "${wa.correct}"`)
       .join('\n');
@@ -96,9 +97,30 @@ export async function POST(request: NextRequest) {
       .map((s: { title: string; content: string }, i: number) => `الشريحة ${i + 1}: "${s.title}"\n${s.content}`)
       .join('\n\n');
 
+    // --- Fetch textbook context (RAG via Gemini File API) ---
+    let textbookFileUri: string | null = null;
+    try {
+      if (quiz.grade) {
+        textbookFileUri = await getTextbookFileUri(quiz.grade);
+        if (textbookFileUri) {
+          console.log(`[generate-final-quiz] Textbook found for grade "${quiz.grade}": ${textbookFileUri}`);
+        }
+      }
+    } catch (err) {
+      console.warn('[generate-final-quiz] Textbook retrieval failed, continuing without:', err);
+    }
+
+    const textbookInstruction = textbookFileUri
+      ? `\n\nIMPORTANT — TEXTBOOK GROUNDING:
+The attached PDF is the official Tunisian math textbook for grade ${quiz.grade}.
+- You MUST base your questions on the methodology, terminology, and problem types found in the textbook's chapter on "${quiz.unit || 'unknown'}".
+- Ensure the re-evaluation questions align with the textbook's teaching approach.
+- Generate questions that test the same skills the textbook emphasizes.`
+      : '';
+
     const prompt = `You are a Tunisian primary school math teacher AI.
 
-A student in grade ${quiz.grade || 'unknown'} just completed an initial evaluation quiz on the unit "${quiz.unit || 'unknown'}" and scored ${initial_score} out of 12.
+A student in grade ${quiz.grade || 'unknown'} just completed an initial evaluation quiz on the unit "${quiz.unit || 'unknown'}" and scored ${initial_score} out of 12.${textbookInstruction}
 
 They then reviewed these Smart Slides:
 ${slidesSummary}
@@ -137,8 +159,32 @@ Return this exact JSON structure:
   ]
 }`;
 
-    const result = await geminiModel.generateContent(prompt);
-    const responseText = result.response.text();
+    // --- Call Gemini (with or without textbook file) ---
+    const contentParts: Parameters<typeof geminiModel.generateContent>[0] = textbookFileUri
+      ? [
+          {
+            fileData: {
+              mimeType: 'application/pdf',
+              fileUri: textbookFileUri,
+            },
+          },
+          { text: prompt },
+        ]
+      : prompt;
+
+    let responseText = '';
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const result = await geminiModel.generateContent(contentParts);
+        responseText = result.response.text();
+        break;
+      } catch (err: unknown) {
+        if (attempt === 3) throw err;
+        console.warn(`[generate-final-quiz] Gemini error on attempt ${attempt}, retrying in 2 seconds...`);
+        await new Promise(r => setTimeout(r, 2000));
+      }
+    }
+
     const parsed = extractJSON<GenerateFinalQuizResponse>(responseText);
 
     // --- Validate parsed response ---
